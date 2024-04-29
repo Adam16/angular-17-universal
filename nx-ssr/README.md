@@ -11,3 +11,10 @@ Angular 17 Universal Server Side Rendering with Nx
 
 This project was generated using [Nx](https://nx.dev).
 
+## Start
+
+Dev Server
+
+```
+npm start
+```
