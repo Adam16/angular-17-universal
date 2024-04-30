@@ -1,19 +1,28 @@
 import type http from 'http';
+import type { Application } from 'express';
+// angular universal parts
 import { APP_BASE_HREF } from '@angular/common';
 import { CommonEngine } from '@angular/ssr';
+// http server parts
 import express from 'express';
 import compression from 'compression';
 import favicon from 'serve-favicon';
 import { rateLimit } from 'express-rate-limit';
+// core node
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-// angular universal app
+// our ssr universal app
 import bootstrap from './src/main.server';
-import { errorClientMiddleware, errorLoggerMiddleware } from './src/middleware';
+// our middleware
+import {
+  errorClientMiddleware,
+  errorLoggerMiddleware,
+  useSecurityMiddleware,
+} from './src/middleware';
 
 // The Express app is exported so that it can be used by serverless Functions.
-export function app(): express.Application {
-  const server = express();
+export function app(): Application {
+  const ssrApp = express();
   const serverDistFolder = dirname(fileURLToPath(import.meta.url));
   const browserDistFolder = resolve(serverDistFolder, '../browser');
   const indexHtml = join(serverDistFolder, 'index.server.html');
@@ -27,21 +36,21 @@ export function app(): express.Application {
 
   const commonEngine = new CommonEngine();
 
+  // App behind a reverse proxy
+  useSecurityMiddleware(ssrApp);
+
   // Enable gzip
-  server.use(compression());
+  ssrApp.use(compression());
 
   // Favicon fallback
-  server.use(favicon(browserDistFolder + 'favicon.ico'));
-
-  // Remove fingerprinting
-  server.disable('x-powered-by');
+  ssrApp.use(favicon(browserDistFolder + 'favicon.ico'));
 
   // Template engine
-  server.set('view engine', 'html');
-  server.set('views', browserDistFolder);
+  ssrApp.set('view engine', 'html');
+  ssrApp.set('views', browserDistFolder);
 
   // Serve static files from /browser
-  server.get(
+  ssrApp.get(
     '*.*',
     express.static(browserDistFolder, {
       maxAge: '1y',
@@ -49,7 +58,7 @@ export function app(): express.Application {
   );
 
   // All regular routes use the Angular engine
-  server.get('*', (req, res, next) => {
+  ssrApp.get('*', (req, res, next) => {
     const { protocol, originalUrl, baseUrl, headers } = req;
 
     commonEngine
@@ -65,10 +74,10 @@ export function app(): express.Application {
   });
 
   // Global error handling
-  server.use(limiter, errorLoggerMiddleware);
-  server.use(limiter, errorClientMiddleware);
+  ssrApp.use(limiter, errorLoggerMiddleware);
+  ssrApp.use(limiter, errorClientMiddleware);
 
-  return server;
+  return ssrApp;
 }
 
 function run(): void {
@@ -83,7 +92,8 @@ function run(): void {
   // SIGTERM signal
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
-    (server as any as http.Server).close(() => {
+    // Express close type does not seem to be available (type-coverage issue?)
+    (server as unknown as http.Server).close(() => {
       console.log('App server closed');
     });
   });
