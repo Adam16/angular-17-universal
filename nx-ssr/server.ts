@@ -1,24 +1,45 @@
+import type http from 'http';
 import { APP_BASE_HREF } from '@angular/common';
 import { CommonEngine } from '@angular/ssr';
 import express from 'express';
+import compression from 'compression';
+import favicon from 'serve-favicon';
+import { rateLimit } from 'express-rate-limit';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+// angular universal app
 import bootstrap from './src/main.server';
+import { errorClientMiddleware, errorLoggerMiddleware } from './src/middleware';
 
 // The Express app is exported so that it can be used by serverless Functions.
-export function app(): express.Express {
+export function app(): express.Application {
   const server = express();
   const serverDistFolder = dirname(fileURLToPath(import.meta.url));
   const browserDistFolder = resolve(serverDistFolder, '../browser');
   const indexHtml = join(serverDistFolder, 'index.server.html');
 
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
+    standardHeaders: 'draft-7', // draft-6: `RateLimit-*` headers; draft-7: combined `RateLimit` header
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
+  });
+
   const commonEngine = new CommonEngine();
 
+  // Enable gzip
+  server.use(compression());
+
+  // Favicon fallback
+  server.use(favicon(browserDistFolder + 'favicon.ico'));
+
+  // Remove fingerprinting
+  server.disable('x-powered-by');
+
+  // Template engine
   server.set('view engine', 'html');
   server.set('views', browserDistFolder);
 
-  // Example Express Rest API endpoints
-  // server.get('/api/**', (req, res) => { });
   // Serve static files from /browser
   server.get(
     '*.*',
@@ -43,6 +64,10 @@ export function app(): express.Express {
       .catch((err) => next(err));
   });
 
+  // Global error handling
+  server.use(limiter, errorLoggerMiddleware);
+  server.use(limiter, errorClientMiddleware);
+
   return server;
 }
 
@@ -52,7 +77,15 @@ function run(): void {
   // Start up the Node server
   const server = app();
   server.listen(port, () => {
-    console.log(`Node Express server listening on http://localhost:${port}`);
+    console.log(`App server listening on http://localhost:${port}`);
+  });
+
+  // SIGTERM signal
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    (server as any as http.Server).close(() => {
+      console.log('App server closed');
+    });
   });
 }
 
