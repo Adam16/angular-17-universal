@@ -20,6 +20,7 @@
         "scripts": [],
         "server": "src/main.server.ts",
         "prerender": true,
+        "allowedCommonJsDependencies": ["compression", "serve-favicon"],
         "ssr": {
           "entry": "server.ts"
         }
@@ -58,7 +59,10 @@
           "buildTarget": "nx-ssr:build:development"
         }
       },
-      "defaultConfiguration": "development"
+      "defaultConfiguration": "development",
+      "options": {
+        "proxyConfig": "./proxy.conf.json"
+      }
     },
     "extract-i18n": {
       "executor": "@angular-devkit/build-angular:extract-i18n",
@@ -76,7 +80,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectName}"],
       "options": {
-        "jestConfig": "jest.config.ts"
+        "jestConfig": "jest.config.app.ts"
       }
     }
   }
