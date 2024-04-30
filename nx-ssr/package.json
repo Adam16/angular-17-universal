@@ -22,6 +22,7 @@
     "@nx/angular": "18.3.4",
     "express": "~4.19.2",
     "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
     "rxjs": "~7.8.1",
     "serve-favicon": "^2.5.0",
     "tslib": "^2.6.2",
@@ -75,4 +76,3 @@
     "includedScripts": []
   }
 }
-
