@@ -43,7 +43,7 @@ export function app(): Application {
   ssrApp.use(compression());
 
   // Favicon fallback
-  ssrApp.use(favicon(browserDistFolder + 'favicon.ico'));
+  ssrApp.use(favicon(browserDistFolder + '/favicon.ico'));
 
   // Template engine
   ssrApp.set('view engine', 'html');
